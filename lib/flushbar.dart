@@ -28,8 +28,9 @@ class Flushbar<T> extends StatefulWidget {
     this.messageText,
     this.icon,
     this.shouldIconPulse = true,
-    this.maxWidth,
-    this.margin = const EdgeInsets.all(0.0),
+    this.maxWidth = 600,
+    this.minWidth = 280,
+    this.margin = const EdgeInsets.symmetric(horizontal: 12),
     this.padding = const EdgeInsets.all(16),
     this.borderRadius,
     this.textDirection = TextDirection.ltr,
@@ -121,6 +122,9 @@ class Flushbar<T> extends StatefulWidget {
 
   /// Use if you need an action from the user. [TextButton] is recommended here
   final Widget? mainButton;
+
+  /// Minimum width for the flushbar. If null, no minimum width is enforced.
+  final double? minWidth;
 
   /// A callback that registers the user's click anywhere. An alternative to [mainButton]
   final OnTap? onTap;
@@ -412,9 +416,20 @@ class _FlushbarOverlayState extends State<_FlushbarOverlay>
 
   @override
   Widget build(BuildContext context) {
+    final constrained = ConstrainedBox(
+      constraints: BoxConstraints(
+        minWidth: widget.flushbar.minWidth ?? 0.0,
+        maxWidth: widget.flushbar.maxWidth ?? double.infinity,
+      ),
+      child: Container(
+        margin: widget.flushbar.margin,
+        child: widget.flushbar,
+      ),
+    );
+
     final content = AlignTransition(
       alignment: _animation,
-      child: widget.flushbar,
+      child: constrained,
     );
 
     if (widget.flushbar.safeArea) {
@@ -594,9 +609,10 @@ class _FlushbarState<K extends Object?> extends State<Flushbar<K>>
   Widget _generateInputFlushbar() {
     return Container(
       key: _backgroundBoxKey,
-      constraints: widget.maxWidth != null
-          ? BoxConstraints(maxWidth: widget.maxWidth!)
-          : null,
+      constraints: BoxConstraints(
+        minWidth: widget.minWidth ?? 0.0,
+        maxWidth: widget.maxWidth ?? double.infinity,
+      ),
       decoration: BoxDecoration(
         color: widget.backgroundColor,
         gradient: widget.backgroundGradient,
@@ -621,9 +637,10 @@ class _FlushbarState<K extends Object?> extends State<Flushbar<K>>
   Widget _generateFlushbar() {
     return Container(
       key: _backgroundBoxKey,
-      constraints: widget.maxWidth != null
-          ? BoxConstraints(maxWidth: widget.maxWidth!)
-          : null,
+      constraints: BoxConstraints(
+        minWidth: widget.minWidth ?? 0.0,
+        maxWidth: widget.maxWidth ?? double.infinity,
+      ),
       decoration: BoxDecoration(
         color: widget.backgroundColor,
         gradient: widget.backgroundGradient,

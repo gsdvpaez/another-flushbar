@@ -31,10 +31,12 @@ void main() {
     expect(flushbar.padding.right, 16);
     expect(flushbar.padding.top, 16);
     expect(flushbar.padding.bottom, 16);
-    expect(flushbar.margin.left, 0);
-    expect(flushbar.margin.right, 0);
+    expect(flushbar.margin.left, 12);
+    expect(flushbar.margin.right, 12);
     expect(flushbar.margin.top, 0);
     expect(flushbar.margin.bottom, 0);
+    expect(flushbar.maxWidth, 600);
+    expect(flushbar.minWidth, 280);
     expect(flushbar.onTap, null);
     expect(flushbar.isDismissible, true);
     expect(flushbar.dismissDirection, FlushbarDismissDirection.VERTICAL);
@@ -44,6 +46,31 @@ void main() {
     expect(flushbar.progressIndicatorValueColor, null);
     expect(flushbar.routeBlur, null);
     expect(flushbar.routeColor, null);
+  });
+
+  testWidgets('Flushbar respects maxWidth, minWidth and margin', (tester) async {
+    final flushbar = Flushbar(
+      message: 'Compact',
+      duration: null,
+      maxWidth: 220,
+      minWidth: 160,
+      margin: const EdgeInsets.symmetric(horizontal: 12),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: const SizedBox.shrink(),
+        ),
+      ),
+    );
+
+    flushbar.show(tester.element(find.byType(Scaffold)));
+    await tester.pump();
+
+    final rect = tester.getRect(find.text('Compact'));
+    expect(rect.width, greaterThanOrEqualTo(160));
+    expect(rect.width, lessThanOrEqualTo(220));
   });
 
   testWidgets('Flushbar should not intercept pop from a modal dialog',
