@@ -412,10 +412,16 @@ class _FlushbarOverlayState extends State<_FlushbarOverlay>
 
   @override
   Widget build(BuildContext context) {
-    return AlignTransition(
+    final content = AlignTransition(
       alignment: _animation,
       child: widget.flushbar,
     );
+
+    if (widget.flushbar.safeArea) {
+      return SafeArea(child: content);
+    }
+
+    return content;
   }
 
   @override
