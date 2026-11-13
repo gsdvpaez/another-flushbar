@@ -45,4 +45,63 @@ void main() {
     expect(flushbar.routeBlur, null);
     expect(flushbar.routeColor, null);
   });
+
+  testWidgets('Flushbar should not intercept pop from a modal dialog',
+      (tester) async {
+    final app = MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: ElevatedButton(
+            onPressed: () {
+              showDialog<void>(
+                context: tester.element(find.byType(Scaffold)),
+                builder: (context) {
+                  return AlertDialog(
+                    title: const Text('Modal content'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () {
+                            Flushbar(
+                              message: 'This is a modal toast',
+                              duration: const Duration(seconds: 2),
+                            ).show(context);
+                          },
+                          child: const Text('Show flushbar'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                          child: const Text('Close modal'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+            child: const Text('Open modal'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(app);
+    await tester.tap(find.text('Open modal'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Modal content'), findsOneWidget);
+    await tester.tap(find.text('Show flushbar'));
+    await tester.pump();
+    expect(find.text('This is a modal toast'), findsOneWidget);
+
+    await tester.tap(find.text('Close modal'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Open modal'), findsOneWidget);
+    expect(find.text('Modal content'), findsNothing);
+    expect(find.text('This is a modal toast'), findsOneWidget);
+  });
 }
