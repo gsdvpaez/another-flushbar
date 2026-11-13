@@ -15,57 +15,57 @@ typedef OnTap = void Function(Flushbar flushbar);
 /// A highly customizable widget so you can notify your user when you fell like he needs a beautiful explanation.
 // ignore: must_be_immutable
 class Flushbar<T> extends StatefulWidget {
-  Flushbar(
-      {Key? key,
-      this.title,
-      this.safeArea = true,
-      this.titleColor,
-      this.titleSize,
-      this.message,
-      this.messageSize,
-      this.messageColor,
-      this.titleText,
-      this.messageText,
-      this.icon,
-      this.shouldIconPulse = true,
-      this.maxWidth,
-      this.margin = const EdgeInsets.all(0.0),
-      this.padding = const EdgeInsets.all(16),
-      this.borderRadius,
-      this.textDirection = TextDirection.ltr,
-      this.borderColor,
-      this.borderWidth = 1.0,
-      this.backgroundColor = const Color(0xFF303030),
-      this.leftBarIndicatorColor,
-      this.boxShadows,
-      this.backgroundGradient,
-      this.mainButton,
-      this.onTap,
-      this.duration,
-      this.isDismissible = true,
-      this.dismissDirection = FlushbarDismissDirection.VERTICAL,
-      this.showProgressIndicator = false,
-      this.progressIndicatorController,
-      this.progressIndicatorBackgroundColor,
-      this.progressIndicatorValueColor,
-      this.flushbarPosition = FlushbarPosition.BOTTOM,
-      this.positionOffset = 0.0,
-      this.flushbarStyle = FlushbarStyle.FLOATING,
-      this.forwardAnimationCurve = Curves.easeOutCirc,
-      this.reverseAnimationCurve = Curves.easeOutCirc,
-      this.animationDuration = const Duration(seconds: 1),
-      FlushbarStatusCallback? onStatusChanged,
-      this.barBlur = 0.0,
-      this.blockBackgroundInteraction = false,
-      this.routeBlur,
-      this.routeColor,
-      this.userInputForm,
-      this.endOffset,
-      this.flushbarRoute, // Please dont init this
-      this.useRootNavigator = true,
-      })
-      // ignore: prefer_initializing_formals
-      : onStatusChanged = onStatusChanged,
+  Flushbar({
+    Key? key,
+    this.title,
+    this.safeArea = true,
+    this.titleColor,
+    this.titleSize,
+    this.message,
+    this.messageSize,
+    this.messageColor,
+    this.titleText,
+    this.messageText,
+    this.icon,
+    this.shouldIconPulse = true,
+    this.maxWidth,
+    this.margin = const EdgeInsets.all(0.0),
+    this.padding = const EdgeInsets.all(16),
+    this.borderRadius,
+    this.textDirection = TextDirection.ltr,
+    this.borderColor,
+    this.borderWidth = 1.0,
+    this.backgroundColor = const Color(0xFF303030),
+    this.leftBarIndicatorColor,
+    this.boxShadows,
+    this.backgroundGradient,
+    this.mainButton,
+    this.onTap,
+    this.duration,
+    this.isDismissible = true,
+    this.dismissDirection = FlushbarDismissDirection.VERTICAL,
+    this.showProgressIndicator = false,
+    this.progressIndicatorController,
+    this.progressIndicatorBackgroundColor,
+    this.progressIndicatorValueColor,
+    this.flushbarPosition = FlushbarPosition.BOTTOM,
+    this.positionOffset = 0.0,
+    this.flushbarStyle = FlushbarStyle.FLOATING,
+    this.forwardAnimationCurve = Curves.easeOutCirc,
+    this.reverseAnimationCurve = Curves.easeOutCirc,
+    this.animationDuration = const Duration(seconds: 1),
+    FlushbarStatusCallback? onStatusChanged,
+    this.barBlur = 0.0,
+    this.blockBackgroundInteraction = false,
+    this.routeBlur,
+    this.routeColor,
+    this.userInputForm,
+    this.endOffset,
+    this.flushbarRoute, // Please dont init this
+    this.useRootNavigator = true,
+  })  
+  // ignore: prefer_initializing_formals
+  : onStatusChanged = onStatusChanged,
         super(key: key) {
     onStatusChanged = onStatusChanged ?? (status) {};
   }
@@ -239,19 +239,22 @@ class Flushbar<T> extends StatefulWidget {
   /// This keeps the toast above modal dialogs and prevents a modal pop from
   /// removing the flushbar.
   Future<T?> show(BuildContext context) async {
-    flushbarRoute = route.showFlushbar<T>(
-      context: context,
-      flushbar: this,
-    ) as route.FlushbarRoute<T?>;
-
-    final navigator = Navigator.maybeOf(context, rootNavigator: useRootNavigator);
+    // 1. Safely resolve overlay state with fallback checks
+    final navigator =
+        Navigator.maybeOf(context, rootNavigator: useRootNavigator);
     final overlayState = navigator?.overlay ??
         Navigator.maybeOf(context, rootNavigator: true)?.overlay ??
         Overlay.maybeOf(context, rootOverlay: true);
 
+    // 2. GUARD: If the overlay isn't mounted yet, silently abort instead of throwing a fatal error
     if (overlayState == null) {
       return Future.value(null);
     }
+
+    flushbarRoute = route.showFlushbar<T>(
+      context: context,
+      flushbar: this,
+    ) as route.FlushbarRoute<T?>;
 
     _overlayEntry ??= OverlayEntry(
       builder: (overlayContext) {
