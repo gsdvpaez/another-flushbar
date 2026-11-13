@@ -244,20 +244,33 @@ class Flushbar<T> extends StatefulWidget {
       flushbar: this,
     ) as route.FlushbarRoute<T?>;
 
-    final overlayState = Overlay.of(context, rootOverlay: useRootNavigator);
+    final navigator = Navigator.maybeOf(context, rootNavigator: useRootNavigator);
+    final overlayState = navigator?.overlay ??
+        Navigator.maybeOf(context, rootNavigator: true)?.overlay ??
+        Overlay.maybeOf(context, rootOverlay: true);
+
+    if (overlayState == null) {
+      return Future.value(null);
+    }
+
     _overlayEntry ??= OverlayEntry(
       builder: (overlayContext) {
         return _FlushbarOverlay(
           flushbar: this,
           onDismissed: () {
-            _overlayEntry?.remove();
+            if (_overlayEntry != null && _overlayEntry!.mounted) {
+              _overlayEntry!.remove();
+            }
             _overlayEntry = null;
           },
         );
       },
     );
 
-    overlayState.insert(_overlayEntry!);
+    if (!_overlayEntry!.mounted) {
+      overlayState.insert(_overlayEntry!);
+    }
+
     return Future.value(null);
   }
 
@@ -265,7 +278,9 @@ class Flushbar<T> extends StatefulWidget {
   /// When this future finishes, it is guaranteed that Flushbar was dismissed.
   Future<T?> dismiss([T? result]) async {
     if (_overlayEntry != null) {
-      _overlayEntry!.remove();
+      if (_overlayEntry!.mounted) {
+        _overlayEntry!.remove();
+      }
       _overlayEntry = null;
       if (flushbarRoute != null) {
         flushbarRoute!.currentStatus = FlushbarStatus.DISMISSED;
