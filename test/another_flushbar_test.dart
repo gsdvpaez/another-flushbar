@@ -65,7 +65,7 @@ void main() {
                           onPressed: () {
                             Flushbar(
                               message: 'This is a modal toast',
-                              duration: const Duration(seconds: 2),
+                              duration: null,
                             ).show(context);
                           },
                           child: const Text('Show flushbar'),

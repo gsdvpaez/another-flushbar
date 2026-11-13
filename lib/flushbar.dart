@@ -233,84 +233,104 @@ class Flushbar<T> extends StatefulWidget {
   final bool useRootNavigator;
 
   route.FlushbarRoute<T?>? flushbarRoute;
+
   OverlayEntry? _overlayEntry;
+  GlobalKey<_FlushbarOverlayState>? _overlayKey;
+  Timer? _dismissTimer;
+  Completer<T?>? _showCompleter;
+  T? _dismissResult;
+  FlushbarStatus? currentStatus;
 
-  /// Show the flushbar without attaching it to the current navigator stack.
-  /// This keeps the toast above modal dialogs and prevents a modal pop from
-  /// removing the flushbar.
-  Future<T?> show(BuildContext context) async {
-    // 1. Safely resolve overlay state with fallback checks
-    final navigator =
-        Navigator.maybeOf(context, rootNavigator: useRootNavigator);
-    final overlayState = navigator?.overlay ??
-        Navigator.maybeOf(context, rootNavigator: true)?.overlay ??
-        Overlay.maybeOf(context, rootOverlay: true);
-
-    // 2. GUARD: If the overlay isn't mounted yet, silently abort instead of throwing a fatal error
-    if (overlayState == null) {
-      return Future.value(null);
+  /// Show the flushbar without attaching it to the current route stack.
+  /// This keeps it visible even when a modal is closed.
+  Future<T?> show(BuildContext context) {
+    if (_overlayEntry != null && _overlayEntry!.mounted) {
+      return _showCompleter?.future ?? Future.value(null);
     }
 
-    flushbarRoute = route.showFlushbar<T>(
-      context: context,
-      flushbar: this,
-    ) as route.FlushbarRoute<T?>;
+    _dismissResult = null;
+    _showCompleter = Completer<T?>();
 
-    _overlayEntry ??= OverlayEntry(
+    final overlay = Overlay.maybeOf(context, rootOverlay: true) ??
+        Navigator.maybeOf(context, rootNavigator: true)?.overlay ??
+        Navigator.maybeOf(context)?.overlay;
+
+    if (overlay == null) {
+      final completer = Completer<T?>();
+      completer.complete(null);
+      return completer.future;
+    }
+
+    _overlayKey = GlobalKey<_FlushbarOverlayState>();
+    _overlayEntry = OverlayEntry(
       builder: (overlayContext) {
         return _FlushbarOverlay(
+          key: _overlayKey,
           flushbar: this,
-          onDismissed: () {
-            if (_overlayEntry != null && _overlayEntry!.mounted) {
-              _overlayEntry!.remove();
+          onStatusChanged: (status) {
+            currentStatus = status;
+
+            if (status == FlushbarStatus.DISMISSED) {
+              _dismissTimer?.cancel();
+              _dismissTimer = null;
+              if (_overlayEntry != null && _overlayEntry!.mounted) {
+                _overlayEntry!.remove();
+              }
+              _overlayEntry = null;
+              _overlayKey = null;
+
+              if (!(_showCompleter?.isCompleted ?? true)) {
+                _showCompleter!.complete(_dismissResult);
+              }
             }
-            _overlayEntry = null;
           },
         );
       },
     );
 
-    if (!_overlayEntry!.mounted) {
-      overlayState.insert(_overlayEntry!);
+    overlay.insert(_overlayEntry!);
+
+    if (duration != null) {
+      _dismissTimer?.cancel();
+      _dismissTimer = Timer(duration!, () {
+        dismiss();
+      });
     }
 
-    return Future.value(null);
+    return _showCompleter!.future;
   }
 
-  /// Dismisses the flushbar causing is to return a future containing [result].
-  /// When this future finishes, it is guaranteed that Flushbar was dismissed.
+  /// Dismisses the flushbar causing it to return a future containing [result].
   Future<T?> dismiss([T? result]) async {
-    if (_overlayEntry != null) {
-      if (_overlayEntry!.mounted) {
-        _overlayEntry!.remove();
-      }
-      _overlayEntry = null;
-      if (flushbarRoute != null) {
-        flushbarRoute!.currentStatus = FlushbarStatus.DISMISSED;
-      }
-      return Future.value(result);
+    _dismissResult = result;
+    _dismissTimer?.cancel();
+    _dismissTimer = null;
+
+    if (_overlayKey?.currentState != null) {
+      _overlayKey!.currentState!.dismiss();
+      return _showCompleter?.future ?? Future.value(result);
     }
 
-    return null;
+    if (_showCompleter != null && !_showCompleter!.isCompleted) {
+      _showCompleter!.complete(result);
+    }
+    if (_overlayEntry != null && _overlayEntry!.mounted) {
+      _overlayEntry!.remove();
+      _overlayEntry = null;
+    }
+    _overlayKey = null;
+    return result;
   }
 
   /// Checks if the flushbar is visible
-  bool isShowing() {
-    return _overlayEntry != null;
-  }
+  bool isShowing() => currentStatus == FlushbarStatus.SHOWING;
 
   /// Checks if the flushbar is dismissed
-  bool isDismissed() {
-    return _overlayEntry == null;
-  }
+  bool isDismissed() => currentStatus == FlushbarStatus.DISMISSED;
 
-  bool isAppearing() {
-    return false;
-  }
+  bool isAppearing() => currentStatus == FlushbarStatus.IS_APPEARING;
 
-  bool isHiding() {
-    return false;
-  }
+  bool isHiding() => currentStatus == FlushbarStatus.IS_HIDING;
 
   @override
   State createState() => _FlushbarState<T?>();
@@ -318,29 +338,32 @@ class Flushbar<T> extends StatefulWidget {
 
 class _FlushbarOverlay extends StatefulWidget {
   const _FlushbarOverlay({
+    Key? key,
     required this.flushbar,
-    required this.onDismissed,
-  });
+    required this.onStatusChanged,
+  }) : super(key: key);
 
   final Flushbar flushbar;
-  final VoidCallback onDismissed;
+  final ValueChanged<FlushbarStatus> onStatusChanged;
 
   @override
   State<_FlushbarOverlay> createState() => _FlushbarOverlayState();
 }
 
 class _FlushbarOverlayState extends State<_FlushbarOverlay>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<Alignment> _animation;
 
   @override
   void initState() {
     super.initState();
+
     _controller = AnimationController(
       duration: widget.flushbar.animationDuration,
       vsync: this,
     );
+
     _animation = AlignmentTween(
       begin: widget.flushbar.flushbarPosition == FlushbarPosition.TOP
           ? const Alignment(-1.0, -2.0)
@@ -348,12 +371,43 @@ class _FlushbarOverlayState extends State<_FlushbarOverlay>
       end: widget.flushbar.flushbarPosition == FlushbarPosition.TOP
           ? const Alignment(-1.0, -1.0)
           : const Alignment(-1.0, 1.0),
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: widget.flushbar.forwardAnimationCurve,
-      reverseCurve: widget.flushbar.reverseAnimationCurve,
-    ));
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: widget.flushbar.forwardAnimationCurve,
+        reverseCurve: widget.flushbar.reverseAnimationCurve,
+      ),
+    );
+
+    _controller.addStatusListener((status) {
+      switch (status) {
+        case AnimationStatus.forward:
+          widget.flushbar.onStatusChanged?.call(FlushbarStatus.IS_APPEARING);
+          widget.onStatusChanged(FlushbarStatus.IS_APPEARING);
+          break;
+        case AnimationStatus.completed:
+          widget.flushbar.onStatusChanged?.call(FlushbarStatus.SHOWING);
+          widget.onStatusChanged(FlushbarStatus.SHOWING);
+          break;
+        case AnimationStatus.reverse:
+          widget.flushbar.onStatusChanged?.call(FlushbarStatus.IS_HIDING);
+          widget.onStatusChanged(FlushbarStatus.IS_HIDING);
+          break;
+        case AnimationStatus.dismissed:
+          widget.flushbar.onStatusChanged?.call(FlushbarStatus.DISMISSED);
+          widget.onStatusChanged(FlushbarStatus.DISMISSED);
+          break;
+      }
+    });
+
     _controller.forward();
+  }
+
+  void dismiss() {
+    if (_controller.status == AnimationStatus.dismissed) {
+      return;
+    }
+    _controller.reverse();
   }
 
   @override
@@ -367,7 +421,6 @@ class _FlushbarOverlayState extends State<_FlushbarOverlay>
   @override
   void dispose() {
     _controller.dispose();
-    widget.onDismissed();
     super.dispose();
   }
 }
